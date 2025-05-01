@@ -1,6 +1,6 @@
 # Simple Phishing Detector
 
-A modern AI-powered phishing detection tool that analyzes suspicious email messages using both machine learning and traditional security heuristics.
+A modern AI-powered phishing detection tool that analyzes suspicious email messages using both machine learning and traditional security heuristics. Uses keyword and basic scoring.
 
 
 ---

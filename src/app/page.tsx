@@ -56,9 +56,10 @@ export default function Home() {
         1
       );
 
-      const isPhishing = finalScore >= 0.3;
+      const explanationLower = aiData.explanation.toLowerCase();
+      const aiFlagsRisk = explanationLower.includes('phishing') || explanationLower.includes('suspicious');
 
-
+      const isPhishing = aiFlagsRisk || finalScore >= 0.3;
 
       const resultData = {
         ...checkData,
@@ -68,7 +69,6 @@ export default function Home() {
         brandFlags: checkData.brandFlags ?? [],
         isPhishing,
       };
-
 
       setResult(resultData);
 
