@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import validator from 'validator';
-import psl, { ParsedDomain } from 'psl';
+import psl from 'psl';
 
 const phishingWords = [
   'urgent',
@@ -91,13 +91,6 @@ export async function POST(req: Request) {
   const brandPenalty = brandFlags.length > 0 ? 0.3 : 0;
   const score = Math.min(baseScore + brandPenalty, 1);
   const isPhishing = matches.length > 0 || brandFlags.length > 0;
-
-  console.log({
-    urls,
-    baseDomains,
-    brandFlags,
-    message: cleanMessage,
-  });
 
 
   return NextResponse.json({

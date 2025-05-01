@@ -18,8 +18,8 @@ export async function POST(req: Request) {
 
 
         return NextResponse.json({ status: 'logged' });
-    } catch (err) {
-
+    }  catch {
+        
         return NextResponse.json({ error: 'Logging failed' }, { status: 500 });
-    }
+      }
 }

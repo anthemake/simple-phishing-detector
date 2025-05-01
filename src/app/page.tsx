@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import Link from "next/link";
+
 
 export default function Home() {
   const [message, setMessage] = useState("");
@@ -51,9 +51,11 @@ export default function Home() {
       const links = extractLinks(message);
 
 
-      const baseScore = checkData.score;
-      const brandPenalty = (checkData.brandFlags?.length || 0) > 0 ? 0.3 : 0;
-      const finalScore = Math.min((checkData.score || 0) + (aiData.aiScore || 0), 1);
+      const finalScore = Math.min(
+        (checkData.score || 0) + ((checkData.brandFlags?.length || 0) > 0 ? 0.3 : 0),
+        1
+      );
+
       const isPhishing = finalScore >= 0.3;
 
 
