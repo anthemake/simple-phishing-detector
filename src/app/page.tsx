@@ -1,103 +1,203 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import Link from "next/link";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [message, setMessage] = useState("");
+  const [result, setResult] = useState<
+    null | {
+      isPhishing: boolean;
+      score: number;
+      matches: string[];
+      explanation: string;
+      links: { text: string; href: string }[];
+      brandFlags: { brand: string; isSuspicious: boolean; matchedLinks: string[] }[];
+    }
+  >(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingDots, setLoadingDots] = useState("");
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+  useEffect(() => {
+    if (!loading) {
+      setLoadingDots("");
+      return;
+    }
+    const interval = setInterval(() => {
+      setLoadingDots((prev) => (prev.length >= 3 ? "" : prev + "."));
+    }, 300);
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  const handleCheck = async () => {
+    setLoading(true);
+    setResult(null);
+    try {
+      const checkRes = await fetch("/api/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+      const checkData = await checkRes.json();
+
+      const aiRes = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+      const aiData = await aiRes.json();
+
+      const links = extractLinks(message);
+
+
+      const baseScore = checkData.score;
+      const brandPenalty = (checkData.brandFlags?.length || 0) > 0 ? 0.3 : 0;
+      const finalScore = Math.min((checkData.score || 0) + (aiData.aiScore || 0), 1);
+      const isPhishing = finalScore >= 0.3;
+
+
+
+      const resultData = {
+        ...checkData,
+        score: finalScore,
+        explanation: aiData.explanation,
+        links,
+        brandFlags: checkData.brandFlags ?? [],
+        isPhishing,
+      };
+
+
+      setResult(resultData);
+
+      await fetch("/api/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, result: resultData }),
+      });
+    } catch (err) {
+      console.error("Error analyzing message:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const extractLinks = (text: string) => {
+    const regex = /\[([^\]]+)\]\((https?:[^\)]+)\)/g;
+    const rawUrls = /https?:\/\/[\w./?=#&%-]+/gi;
+    const results: { text: string; href: string }[] = [];
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+      results.push({ text: match[1], href: match[2] });
+    }
+    const rawMatches = text.match(rawUrls);
+    if (rawMatches) {
+      rawMatches.forEach((url) => {
+        if (!results.some((r) => r.href === url)) {
+          results.push({ text: url, href: url });
+        }
+      });
+    }
+    return results;
+  };
+
+  return (
+    <main className="min-h-screen bg-[#0d1117] text-white px-4 py-12 flex flex-col items-center justify-center font-inter">
+      <motion.h1
+        className="text-4xl font-bold mb-10 text-sky-400 tracking-tight"
+        initial={{ opacity: 0, y: -30 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        Simple Phishing Detector
+      </motion.h1>
+
+      <textarea
+        className="w-full max-w-3xl h-40 p-4 text-white bg-gray-800 rounded-md resize-none placeholder-gray-400 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-400 text-base"
+        placeholder="Paste suspicious email or message here..."
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+      />
+
+      <div className="mt-6 flex gap-4">
+        <button
+          className="bg-sky-500 hover:bg-sky-600 text-white px-6 py-2 rounded-md shadow-sm text-base min-w-[140px]"
+          onClick={handleCheck}
+          disabled={loading}
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          {loading && !result ? `Analyzing${loadingDots}` : "Analyze Message"}
+
+        </button>
+        <button
+          className="bg-gray-700 hover:bg-gray-600 px-5 py-2 rounded-md text-white text-base"
+          onClick={() => {
+            setMessage('');
+            setResult(null);
+            setLoading(false);
+          }}
         >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          Reset
+        </button>
+
+      </div>
+
+      {result && (
+        <motion.div
+          className="mt-10 w-full max-w-4xl bg-gray-900 p-6 rounded-xl shadow-lg text-sm"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
         >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          <h2 className="text-xl font-semibold text-sky-300 mb-4 border-b border-gray-700 pb-2">
+            📋 Report Summary
+          </h2>
+
+          <div className="space-y-3">
+            <p><strong>Status:</strong> {result.isPhishing ? "⚠️ Likely Phishing" : "✅ Safe"}</p>
+            <p><strong>Combined Score:</strong> {Math.round(result.score * 100)}%</p>
+            <p><strong>Matched Keywords:</strong> {result.matches.join(", ") || "None"}</p>
+          </div>
+
+          <div className="mt-5">
+            <h3 className="text-base font-semibold text-sky-200 mb-1">🧠 AI Explanation</h3>
+            <p className="text-white/90 whitespace-pre-line">{result.explanation}</p>
+          </div>
+
+          {result.links.length > 0 && (
+            <div className="mt-5">
+              <h3 className="text-base font-semibold text-sky-200 mb-1">🔗 Detected Links</h3>
+              <ul className="list-disc pl-6 text-white/90">
+                {result.links.map((link, i) => (
+                  <li key={i} className="mb-1">
+                    <span className="text-red-400 break-all">{link.href}</span>
+                    <p className="text-xs text-gray-400">⚠️ Link shown for analysis only — do not click.</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {(result.brandFlags ?? []).length > 0 && (
+            <div className="mt-5">
+              <h3 className="text-base font-semibold text-yellow-300 mb-1">🚩 Brand Mismatch Alerts</h3>
+              <ul className="list-disc pl-6 text-white/90">
+                {result.brandFlags.map((flag, i) => (
+                  <li key={i} className="mb-2">
+                    Mentions <strong>{flag.brand}</strong> but links to:
+                    <ul className="pl-4">
+                      {flag.matchedLinks.map((link, j) => (
+                        <li key={j} className="text-red-400 break-all">{link}</li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-yellow-500 font-semibold mt-1">
+                      ⚠️ Untrusted domain used. Possible impersonation.
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </motion.div>
+      )}
+    </main>
   );
 }
